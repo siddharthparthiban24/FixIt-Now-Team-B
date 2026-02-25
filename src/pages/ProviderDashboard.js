@@ -329,6 +329,10 @@ const ProviderDashboard = () => {
     () => providerBookings.find((booking) => booking.id === activeChatTarget) || null,
     [providerBookings, activeChatTarget]
   );
+  const visibleChatBookings = useMemo(() => {
+    if (activeChatTarget === "admin" || !activeChatBooking) return [];
+    return [activeChatBooking];
+  }, [activeChatTarget, activeChatBooking]);
 
   const onToggleOnline = () => {
     if (!providerEmail) return;
@@ -727,7 +731,7 @@ const ProviderDashboard = () => {
           >
             Admin
           </button>
-          {acceptedBookings.map((booking) => {
+          {visibleChatBookings.map((booking) => {
             const unreadCount = providerUnreadMessageByBookingId[booking.id] || 0;
             return (
               <button

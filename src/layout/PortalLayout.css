@@ -294,6 +294,12 @@
   font-size: 13px;
 }
 
+.portal-title-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .portal-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -434,6 +440,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.portal-filter-panel {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed var(--portal-border);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.72);
 }
 
 .portal-field {

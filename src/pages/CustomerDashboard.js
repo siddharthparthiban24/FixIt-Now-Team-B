@@ -63,6 +63,19 @@ const getMessageEpochMs = (message = {}) => {
   return Number.isFinite(idTime) && idTime > 0 ? idTime : 0;
 };
 
+const marketplaceAmountRanges = [
+  {
+    value: "All",
+    label: "All amounts",
+    min: Number.NEGATIVE_INFINITY,
+    max: Number.POSITIVE_INFINITY
+  },
+  { value: "0-500", label: "Rs.0 - Rs.500", min: 0, max: 500 },
+  { value: "501-1000", label: "Rs.501 - Rs.1000", min: 501, max: 1000 },
+  { value: "1001-2000", label: "Rs.1001 - Rs.2000", min: 1001, max: 2000 },
+  { value: "2001+", label: "Rs.2001 and above", min: 2001, max: Number.POSITIVE_INFINITY }
+];
+
 const CustomerDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,6 +92,11 @@ const CustomerDashboard = () => {
   const customerEmail = normalizeEmail(user?.email || portalData.customerProfile.email || "");
   const [filter, setFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("");
+  const [showMarketplaceFilters, setShowMarketplaceFilters] = useState(false);
+  const [serviceNameFilter, setServiceNameFilter] = useState("All");
+  const [providerNameFilter, setProviderNameFilter] = useState("All");
+  const [amountRangeFilter, setAmountRangeFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("default");
   const [customerDraft, setCustomerDraft] = useState(portalData.customerProfile);
   const [feedback, setFeedback] = useState("");
   const [chatText, setChatText] = useState("");
@@ -166,17 +184,72 @@ const CustomerDashboard = () => {
     return Array.from(categorySet);
   }, [marketplaceServices]);
 
+  const serviceNameOptions = useMemo(() => {
+    const serviceNames = new Set(["All"]);
+    marketplaceServices.forEach((service) => serviceNames.add(service.subcategory));
+    return Array.from(serviceNames);
+  }, [marketplaceServices]);
+
+  const providerNameOptions = useMemo(() => {
+    const providerNames = new Set(["All"]);
+    marketplaceServices.forEach((service) => providerNames.add(service.providerName));
+    return Array.from(providerNames);
+  }, [marketplaceServices]);
+
   const filteredServices = useMemo(() => {
-    return marketplaceServices.filter((service) => {
+    const selectedAmountRange =
+      marketplaceAmountRanges.find((range) => range.value === amountRangeFilter) ||
+      marketplaceAmountRanges[0];
+
+    const matches = marketplaceServices.filter((service) => {
       const categoryMatches = filter === "All" || service.category === filter;
+      const serviceNameMatches =
+        serviceNameFilter === "All" || service.subcategory === serviceNameFilter;
+      const providerNameMatches =
+        providerNameFilter === "All" || service.providerName === providerNameFilter;
       const locationMatches = !locationFilter.trim()
         ? true
         : String(service.providerLocation || "")
             .toLowerCase()
             .includes(locationFilter.trim().toLowerCase());
-      return categoryMatches && locationMatches;
+
+      const numericPrice = Number(service.price || 0);
+      const amountMatches =
+        selectedAmountRange.value === "All"
+          ? true
+          : numericPrice >= selectedAmountRange.min && numericPrice <= selectedAmountRange.max;
+
+      return (
+        categoryMatches &&
+        serviceNameMatches &&
+        providerNameMatches &&
+        locationMatches &&
+        amountMatches
+      );
     });
-  }, [marketplaceServices, filter, locationFilter]);
+
+    if (sortBy === "price-low-high") {
+      return [...matches].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+    if (sortBy === "price-high-low") {
+      return [...matches].sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+    }
+    if (sortBy === "rating-high-low") {
+      return [...matches].sort(
+        (a, b) => Number(b.providerRating || 0) - Number(a.providerRating || 0)
+      );
+    }
+
+    return matches;
+  }, [
+    marketplaceServices,
+    filter,
+    locationFilter,
+    serviceNameFilter,
+    providerNameFilter,
+    amountRangeFilter,
+    sortBy
+  ]);
 
   const customerBookings = useMemo(
     () =>
@@ -411,6 +484,13 @@ const CustomerDashboard = () => {
     setFeedback(`Attached: ${file.name}`);
   };
 
+  const resetMarketplaceFilters = () => {
+    setServiceNameFilter("All");
+    setProviderNameFilter("All");
+    setAmountRangeFilter("All");
+    setSortBy("default");
+  };
+
   const CustomerHome = () => (
     <>
       <section className="portal-card portal-hero">
@@ -477,8 +557,17 @@ const CustomerDashboard = () => {
   const CustomerServices = () => (
     <section className="portal-card">
       <div className="portal-title-row">
-        <h3>Service Marketplace</h3>
-        <p>Filter by category and provider location</p>
+        <div className="portal-title-copy">
+          <h3>Service Marketplace</h3>
+          <p>Filter by category and provider location</p>
+        </div>
+        <button
+          type="button"
+          className="portal-button secondary"
+          onClick={() => setShowMarketplaceFilters((prev) => !prev)}
+        >
+          {showMarketplaceFilters ? "Hide Filters" : "Filters"}
+        </button>
       </div>
 
       <div className="portal-form-grid">
@@ -508,11 +597,75 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
+      {showMarketplaceFilters && (
+        <section className="portal-filter-panel">
+          <div className="portal-form-grid">
+            <div className="portal-field">
+              <label>Amount range</label>
+              <select
+                value={amountRangeFilter}
+                onChange={(e) => setAmountRangeFilter(e.target.value)}
+              >
+                {marketplaceAmountRanges.map((range) => (
+                  <option key={range.value} value={range.value}>
+                    {range.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="portal-field">
+              <label>Service name</label>
+              <select
+                value={serviceNameFilter}
+                onChange={(e) => setServiceNameFilter(e.target.value)}
+              >
+                {serviceNameOptions.map((serviceName) => (
+                  <option key={serviceName} value={serviceName}>
+                    {serviceName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="portal-field">
+              <label>Provider</label>
+              <select
+                value={providerNameFilter}
+                onChange={(e) => setProviderNameFilter(e.target.value)}
+              >
+                {providerNameOptions.map((providerName) => (
+                  <option key={providerName} value={providerName}>
+                    {providerName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="portal-field">
+              <label>Sort by</label>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="default">Default</option>
+                <option value="price-low-high">Price: Low to High</option>
+                <option value="price-high-low">Price: High to Low</option>
+                <option value="rating-high-low">Rating: High to Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="portal-button-row">
+            <button type="button" className="portal-button secondary" onClick={resetMarketplaceFilters}>
+              Clear Additional Filters
+            </button>
+          </div>
+        </section>
+      )}
+
       <div className="portal-list-grid" style={{ marginTop: 14 }}>
         {filteredServices.length === 0 && (
           <article className="portal-list-card">
             <h4>No services found</h4>
-            <p className="portal-list-sub">Try changing category or location filter.</p>
+            <p className="portal-list-sub">Try changing category, location, or filter values.</p>
           </article>
         )}
 
